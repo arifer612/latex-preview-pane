@@ -95,7 +95,7 @@
          'is-latex-preview-pane t))
     (lpp/display-startup (lpp/window-containing-preview))
     ;; add the save hook
-    (add-hook 'after-save-hook 'latex-preview-pane-update nil 'make-it-local)
+    (add-hook 'after-save-hook 'latex-preview-pane-update-on-save nil 'make-it-local)
     ;; refresh that pane
     
     (run-at-time "0 min 3 sec" nil 'latex-preview-pane-update)
@@ -172,6 +172,11 @@
 	(message "Updating LaTeX Preview Pane")
 	(latex-preview-pane-update-p)))))
 
+(defun latex-preview-pane-update-on-save ()
+  (if (eq auto-update-latex-preview-pane 'on)
+      (latex-preview-pane-update)
+    )
+  )
 
 
 (defun lpp/last-backtrace ()
@@ -420,6 +425,14 @@
   "If set, LaTeX Preview Pane will show preview in a new frame"
   :type 'boolean
   :group 'latex-preview-pane)
+
+(defcustom auto-update-latex-preview-pane 'on
+  "Auto update the preview panel on save."
+  :type '(choice (const :tag "On" on)
+                 (const :tag "Off" off)
+                 )
+  :group 'latex-preview-pane)
+
 
 ;;
 ;; Some utility functions

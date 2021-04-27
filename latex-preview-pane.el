@@ -46,7 +46,7 @@
 (require 'doc-view)
 (require 'cl-lib)
 
-(defvar latex-preview-pane-current-version "20210417")
+(defvar latex-preview-pane-current-version "20210427")
 ;;
 ;; Get rid of free variables warnings
 ;;
@@ -82,7 +82,7 @@
 ;;
 
 ;;;###autoload
-(defun init-latex-preview-pane ()
+(defun init-latex-preview-pane (a)
   (progn
     ;; make sure the current window isn't the preview pane
     (set-window-parameter nil 'is-latex-preview-pane nil)
@@ -98,7 +98,7 @@
     (add-hook 'after-save-hook 'latex-preview-pane-update-on-save nil 'make-it-local)
     ;; refresh that pane
 
-    (run-at-time "0 min 3 sec" nil 'latex-preview-pane-update)))
+    (run-at-time "0 min 3 sec" nil a)))
 
 
 (defun lpp/get-message (f)
@@ -158,7 +158,7 @@
   (interactive)
   (when  (and (boundp 'latex-preview-pane-mode) latex-preview-pane-mode)
     (if (eq (lpp/window-containing-preview) nil)
-	(init-latex-preview-pane)
+	(init-latex-preview-pane #'latex-preview-pane-update)
       (progn
 	(if (not (eq (get-buffer "*pdflatex-buffer*") nil))
 	    (let ((old-buff (current-buffer)))
@@ -282,11 +282,34 @@ recompilation.")
 
 
 
+(defun lpp/tex-sync ()
+  (if (not (eq synctex-number "0"))
+      (TeX-pdf-tools-sync-view)))
+
+
 (defun lpp/invoke-pdf-latex-command ()
   (let ((buff (expand-file-name (lpp/buffer-file-name))) (default-directory (file-name-directory (expand-file-name (lpp/buffer-file-name)))))
     (if (string-match pdf-latex-command "luatex")  ;; long flags in luatex require -- (man luatex)
         (call-process pdf-latex-command nil "*pdflatex-buffer*" nil (concat "--synctex=" synctex-number " -" shell-escape-mode) buff)
         (call-process pdf-latex-command nil "*pdflatex-buffer*" nil (concat "-synctex=" synctex-number " " shell-escape-mode) buff))))
+
+
+(defun latex-preview-pane-load ()
+  (let ((pdf-filename (replace-regexp-in-string "\.tex$" ".pdf" (lpp/buffer-file-name)))
+        (tex-buff (current-buffer))
+        (pdf-buff-name (replace-regexp-in-string "\.tex" ".pdf" (buffer-name (get-file-buffer (lpp/buffer-file-name))))))
+    (lpp/remove-error-overlays)
+    ;; if the file doesn't exist, say that the file isn't available due to error messages
+    (if (file-exists-p pdf-filename)
+        (if (eq (get-buffer pdf-buff-name) nil)
+            (let ((pdf-buff (find-file-noselect pdf-filename 'nowarn)))
+              (buffer-disable-undo pdf-buff)
+              (set-window-buffer (lpp/window-containing-preview) pdf-buff)
+              (lpp/tex-sync))
+          (progn
+            (set-window-buffer (lpp/window-containing-preview) pdf-buff-name)
+            (with-current-buffer pdf-buff-name (doc-view-revert-buffer nil t))
+            (lpp/tex-sync))))))
 
 
 ;;;###autoload
@@ -297,21 +320,8 @@ recompilation.")
         (lpp/remove-error-overlays)
         (lpp/line-errors-to-layovers (lpp/line-errors))
         )
+    (latex-preview-pane-load)))
 
-    (let ((pdf-filename (replace-regexp-in-string "\.tex$" ".pdf" (lpp/buffer-file-name)))
-    (tex-buff (current-buffer))
-    (pdf-buff-name (replace-regexp-in-string "\.tex" ".pdf" (buffer-name (get-file-buffer (lpp/buffer-file-name))))))
-    (lpp/remove-error-overlays)
-      ;; if the file doesn't exist, say that the file isn't available due to error messages
-      (if (file-exists-p pdf-filename)
-          (if (eq (get-buffer pdf-buff-name) nil)
-              (let ((pdf-buff (find-file-noselect pdf-filename 'nowarn)))
-                (buffer-disable-undo pdf-buff)
-                (set-window-buffer (lpp/window-containing-preview) pdf-buff))
-            (progn
-              (set-window-buffer (lpp/window-containing-preview) pdf-buff-name)
-              (with-current-buffer pdf-buff-name (doc-view-revert-buffer nil t))
-              (TeX-pdf-tools-sync-view)))))))
 
 ;;
 ;; Mode definition
@@ -372,7 +382,7 @@ recompilation.")
        :group 'latex-preview-pane
        ;; if we are turning on the mode, init the view
        (if (and (boundp 'latex-preview-pane-mode) latex-preview-pane-mode)
-	   (init-latex-preview-pane)
+	   (init-latex-preview-pane #'latex-preview-pane-load)
 	 ;; otherwise, kill the window
 	 (delete-window (lpp/window-containing-preview))))
 

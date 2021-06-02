@@ -1,0 +1,4 @@
+# [Feature] Option to save manually
+
+PR to save .tex files manually instead of enforcing auto-save in `latex-preview-pane-mode`.
+Only the crucial idea will be implemented and edited.

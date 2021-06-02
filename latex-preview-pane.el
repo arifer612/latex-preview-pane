@@ -295,6 +295,7 @@ recompilation.")
 
 
 (defun latex-preview-pane-load ()
+  ;; FIXME lpp/buffer-file-name returning a nil on load
   (let ((pdf-filename (replace-regexp-in-string "\.tex$" ".pdf" (lpp/buffer-file-name)))
         (tex-buff (current-buffer))
         (pdf-buff-name (replace-regexp-in-string "\.tex" ".pdf" (buffer-name (get-file-buffer (lpp/buffer-file-name))))))
